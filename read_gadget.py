@@ -16,6 +16,7 @@ import numpy as np
 
 # Full path to the snapshot (without any .x suffix if snapshots splitted in more files)
 filename = "/scratch/extra/marco.baldi5/Alessandro/snapdir_005/snap_005"
+#filename = "/scratch/extra/marco.baldi5/Alessandro/C-Gadget_examples/output_lcdm_128/snapdir_005/snap_005"
 
 
 # ------------ FILE IMPORT ------------
@@ -164,6 +165,7 @@ def read_header(filename, print_informations = True):
 
     snap.close()
 
+    Nparticles_file = np.sum(npart_file)
     Nparticles = np.sum(npart_sim)
 
     # Print informations about the simulation
@@ -177,7 +179,7 @@ def read_header(filename, print_informations = True):
         print("- Omega_cdm:           ", Omega_cdm)
         print("- Omega_Lambda:        ", Omega_Lambda)
 
-    return nfile, gformat, swap
+    return nfile, Nparticles, Nparticles_file, gformat, swap
 
 
 
@@ -190,7 +192,7 @@ def read_header(filename, print_informations = True):
 #       n_part_file on each snapshot file
 def extract_block(filename, block, verbose = 1):
 
-    nfile, gformat, swap = read_header(filename, print_informations = False)
+    nfile, Nparticles, Nparticles_file, gformat, swap = read_header(filename, print_informations = False)
 
     if verbose > 0: print(" " + "-" * 45)
 
@@ -255,6 +257,10 @@ def extract_block(filename, block, verbose = 1):
 
                 if verbose > 0: print("Find block '" + block + "' in snapshot", i ,". Reading...")
 
+                # Fix "ID  " if long int is used
+                if i == 0 and block == "ID  " and blocksize == Nparticles_file * np.dtype(data_type).itemsize * 2:
+                    data_type = np.int64
+
                 # We append the whole block of data (we split them in 3d arrays later if POS and VEL)
                 # Note: This should be faster than splitting data here with a loop
                 data = np.append(data, np.fromfile(snap, dtype = data_type, count = int(blocksize/np.dtype(data_type).itemsize)))
@@ -294,13 +300,17 @@ def extract_block(filename, block, verbose = 1):
             print("\nError: Data is not divisible by 3, can not split data")
             return None
 
+    # Check if the length of the fata is equal to the number of particles
+    if block in ["POS ", "VEL ", "ID  "] and len(data) != Nparticles:
+        print("\nError: Data seems not correct. Shape:", len(data), " - Number particles:", Nparticles)
+
     return data
 
 
 
 # ------------ MAIN ------------
 
-nfile, gformat, swap = read_header(filename)
+nfile, Nparticles, Nparticles_file, gformat, swap = read_header(filename)
 
 if gformat in [1,2]:
 
